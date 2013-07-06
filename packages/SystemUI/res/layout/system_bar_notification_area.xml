@@ -67,7 +67,6 @@
                 android:layout_height="match_parent"
                 android:layout_gravity="center_vertical"
                 android:layout_marginLeft="8dp"
-                android:alpha="0.4"
                 />
         </com.android.systemui.statusbar.tablet.NotificationIconArea>
     </LinearLayout>
@@ -84,8 +83,8 @@
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:singleLine="true"
-            android:paddingLeft="6dip"
-            android:layout_marginRight="8dip"
+            android:paddingLeft="3dip"
+            android:layout_marginRight="4dip"
             android:gravity="center_vertical|left"
             android:clickable="false"
             />
@@ -94,8 +93,8 @@
             android:id="@+id/network_text"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_marginRight="6dip"
-            android:layout_marginLeft="6dip"
+            android:layout_marginRight="3dip"
+            android:layout_marginLeft="3dip"
             android:gravity="center"
             android:singleLine="true"
             android:visibility="gone"
@@ -107,7 +106,7 @@
             android:id="@+id/signal_battery_cluster"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_marginRight="16dp"
+            android:layout_marginRight="4dp"
             android:orientation="horizontal"
             android:gravity="center"
             >
@@ -120,7 +119,7 @@
                 android:id="@+id/bluetooth"
                 android:layout_height="wrap_content"
                 android:layout_width="wrap_content"
-                android:paddingLeft="4dip"
+                android:paddingLeft="2dip"
                 android:visibility="gone"
                 />
             <com.android.systemui.statusbar.policy.CircleBattery
@@ -128,14 +127,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:singleLine="true"
-                android:paddingLeft="4dip"
+                android:paddingLeft="2dip"
                 android:gravity="center_vertical|left"
                 />
             <ImageView
                 android:id="@+id/battery"
                 android:layout_height="wrap_content"
                 android:layout_width="wrap_content"
-                android:paddingLeft="4dip"
+                android:paddingLeft="2dip"
                 />
         </LinearLayout>
     </LinearLayout>
