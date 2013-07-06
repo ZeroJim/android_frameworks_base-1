@@ -67,7 +67,7 @@ public class ThemeResources
     protected static Map<String, String> sMiuiToChaosPackageMappings;
     static {
         sMiuiToChaosPackageMappings = new HashMap();
-        sMiuiToChaosPackageMappings.put("framework-res", "framework-miui-res");
+        sMiuiToChaosPackageMappings.put("framework-res", "com.android.systemui");
         sMiuiToChaosPackageMappings.put("android", "com.android.systemui");
         sMiuiToChaosPackageMappings.put("com.android.contacts", "com.android.phone");
         sMiuiToChaosPackageMappings.put("com.android.mms", "framework-miui-res");
@@ -159,6 +159,7 @@ public class ThemeResources
         map.put("ic_notify_quicksettings_normal.png", "toggle_settings_n.png");
         map.put("ic_notify_open_pressed.png", "toggle_settings_p.png");
         map.put("ic_notify_open_normal.png", "toggle_settings_n.png");
+
         sMiuiToChaosResourceMappings.put("com.android.systemui", map);
         map = new HashMap();
         map.put("dial_num_0_wht.png", "dial_num_0_no_plus_wht.png");
@@ -192,7 +193,7 @@ public class ThemeResources
         if (sMiuiToChaosPackageMappings.containsKey(componentName)) {
             if (DBG)
                 Log.i(TAG, "Loading wrapper " + sMiuiToChaosPackageMappings.get(componentName) + " for " + componentName);
-            mWrapped = new ThemeResourcesPackage(null, resources, sMiuiToChaosPackageMappings.get(componentName), metaData);
+            mWrapped = ThemeResourcesPackage.getThemeResources(resources, sMiuiToChaosPackageMappings.get(componentName), componentName);
             supportWrapper = true;
         }
         mSupportWrapper = supportWrapper;
@@ -248,7 +249,7 @@ public class ThemeResources
 
     public boolean checkUpdate() {
         boolean result = mPackageZipFile.checkUpdate();
-        mHasWrapped = (mWrapped != null && (mSupportWrapper || !mPackageZipFile.exists()));
+        mHasWrapped = mWrapped != null;// && (mSupportWrapper || !mPackageZipFile.exists()));
 
         if(mHasWrapped)
             if(mWrapped.checkUpdate() || result)
@@ -274,6 +275,17 @@ public class ThemeResources
         CharSequence ret = mPackageZipFile.getThemeCharSequence(id);
         if(ret == null && mHasWrapped)
             ret = mWrapped.getThemeCharSequenceInner(id);
+        return ret;
+    }
+
+    public CharSequence getThemeCharSequence(String name) {
+        return getThemeCharSequenceInner(name);
+    }
+
+    protected CharSequence getThemeCharSequenceInner(String name) {
+        CharSequence ret = mPackageZipFile.getThemeCharSequence(name);
+        if(ret == null && mHasWrapped)
+            ret = mWrapped.getThemeCharSequenceInner(name);
         return ret;
     }
 
@@ -315,12 +327,30 @@ public class ThemeResources
 
     protected ThemeZipFile.ThemeFileInfo getThemeFileStreamInner(String relativeFilePath) {
         if (DBG)
-            Log.i(TAG, "getThemeFileStreamInnter(" + relativeFilePath + ")");
-        ThemeZipFile.ThemeFileInfo ret = mPackageZipFile.getInputStream(relativeFilePath);
-        if(ret == null && mHasWrapped) {
+            Log.i(TAG + ":" + mPackageZipFile.mPackageName, "getThemeFileStreamInner(" + relativeFilePath + ")");
+        ThemeZipFile.ThemeFileInfo ret = null;
+        if ( !((this instanceof ThemeResourcesSystem) && relativeFilePath.contains("stat_sys_battery")) )
+            ret = mPackageZipFile.getInputStream(relativeFilePath);
+
+        if(ret == null && mWrapped != null) {
             if (DBG)
                 Log.i(TAG, "Checking wrapper for " + relativeFilePath);
             ret = mWrapped.getThemeFileStreamInner(relativeFilePath);
+            if (ret == null) {
+                int index = relativeFilePath.indexOf("dpi/");
+                if(index > 0) {
+                    String fileName = relativeFilePath.substring(index + 4);
+                    String prefix = relativeFilePath.substring(0, index + 4);
+                    if (DBG)
+                        Log.i(TAG, "Checking for mapping of " + prefix + fileName + " for " + mPackageZipFile.mPackageName);
+                    Map<String, String> mapping = sMiuiToChaosResourceMappings.get(mPackageZipFile.mPackageName);
+                    if (mapping != null && mapping.containsKey(fileName)) {
+                        if (DBG)
+                            Log.i(TAG, "Mapping " + fileName + " to " + mapping.get(fileName));
+                        ret = getThemeFileStreamInner(prefix + mapping.get(fileName));
+                    }
+                }
+            }
         }
         return ret;
     }
@@ -330,18 +360,43 @@ public class ThemeResources
     }
 
     protected Integer getThemeIntInner(int id) {
+        if (DBG)
+            Log.i(TAG + ":" + mPackageZipFile.mPackageName, "getThemeIntInner(0x" + Integer.toHexString(id) + ")");
         Integer integer = mPackageZipFile.getThemeInt(id);
-        if(integer == null && mHasWrapped)
+        if(integer == null && mWrapped != null)
             integer = mWrapped.getThemeIntInner(id);
+        if (DBG)
+            Log.i(TAG + ":" + mPackageZipFile.mPackageName, "getThemeIntInner=" + integer);
+        return integer;
+    }
+
+    public Integer getThemeInt(String name) {
+        return getThemeIntInner(name, true);
+    }
+
+    public Integer getThemeInt(String name, boolean checkWrapped) {
+        return getThemeIntInner(name, checkWrapped);
+    }
+
+    protected Integer getThemeIntInner(String name, boolean checkWrapped) {
+        if (DBG)
+            Log.i(TAG + ":" + mPackageZipFile.mPackageName, "getThemeIntInner(" + name + ")");
+        Integer integer = mPackageZipFile.getThemeInt(name);
+        if(integer == null && mWrapped != null && checkWrapped)
+            integer = mWrapped.getThemeIntInner(name, false);
+        if(integer == null && !(this instanceof ThemeResourcesSystem))
+            integer = sSystem.getThemeInt(name, false);
+        if (DBG)
+            Log.i(TAG + ":" + mPackageZipFile.mPackageName, "getThemeIntInner=" + integer);
         return integer;
     }
 
     public boolean hasValues() {
-        return this.mHasValue;
+        return this.mHasValue || (mWrapped != null && mWrapped.mHasValue);
     }
 
     protected boolean hasValuesInner() {
-        return mPackageZipFile.hasValues() || mHasWrapped && mWrapped.hasValuesInner();
+        return mPackageZipFile.hasValues() || (mHasWrapped && mWrapped.hasValuesInner());
     }
 
     protected static final class MetaData {

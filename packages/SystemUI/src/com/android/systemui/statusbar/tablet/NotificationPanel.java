@@ -39,6 +39,7 @@ import android.widget.RelativeLayout;
 import com.android.systemui.ExpandHelper;
 import com.android.systemui.R;
 import com.android.systemui.statusbar.policy.NotificationRowLayout;
+import com.android.systemui.statusbar.powerwidget.StatusBarToggles;
 
 public class NotificationPanel extends RelativeLayout implements StatusBarPanel,
         View.OnClickListener {
@@ -60,6 +61,8 @@ public class NotificationPanel extends RelativeLayout implements StatusBarPanel,
     ViewGroup mContentFrame;
     Rect mContentArea = new Rect();
     View mSettingsView;
+    StatusBarToggles mCompactToggles;
+    StatusBarToggles mPagedToggles;
     ViewGroup mContentParent;
     TabletStatusBar mBar;
     View mClearButton;
@@ -104,6 +107,10 @@ public class NotificationPanel extends RelativeLayout implements StatusBarPanel,
         // the "X" that appears in place of the clock when the panel is showing notifications
         mClearButton = findViewById(R.id.clear_all_button);
         mClearButton.setOnClickListener(mClearButtonListener);
+
+        mCompactToggles = (StatusBarToggles) findViewById(R.id.compact_toggles);
+        mCompactToggles.setupWidget();
+        mCompactToggles.setGlobalButtonOnLongClickListener(mOnToggleLongClick);
 
         mShowing = false;
     }
@@ -269,6 +276,7 @@ public class NotificationPanel extends RelativeLayout implements StatusBarPanel,
                 if (toShow != null) {
                     toShow.setVisibility(View.VISIBLE);
                     if (toShow == mSettingsView || mNotificationCount > 0) {
+                        mCompactToggles.setVisibility(View.GONE);
                         ObjectAnimator.ofFloat(toShow, "alpha", 0f, 1f)
                                 .setDuration(PANEL_FADE_DURATION)
                                 .start();
@@ -276,6 +284,7 @@ public class NotificationPanel extends RelativeLayout implements StatusBarPanel,
 
                     if (toHide == mSettingsView) {
                         removeSettingsView();
+                        mCompactToggles.setVisibility(View.VISIBLE);
                     }
                 }
                 updateClearButton();
@@ -326,10 +335,21 @@ public class NotificationPanel extends RelativeLayout implements StatusBarPanel,
     // NB: it will be invisible until you show it
     void addSettingsView() {
         LayoutInflater infl = LayoutInflater.from(getContext());
-        mSettingsView = infl.inflate(R.layout.system_bar_settings_view, mContentFrame, false);
+        //mSettingsView = infl.inflate(R.layout.system_bar_settings_view, mContentFrame, false);
+        mSettingsView = infl.inflate(R.layout.system_bar_toggles_view, mContentFrame, false);
         mSettingsView.setVisibility(View.GONE);
         mContentFrame.addView(mSettingsView);
+        mPagedToggles = (StatusBarToggles) mSettingsView.findViewById(R.id.status_bar_toggles);
+        if (mPagedToggles != null)
+            mPagedToggles.setGlobalButtonOnLongClickListener(mOnToggleLongClick);
     }
+
+    private View.OnLongClickListener mOnToggleLongClick = new View.OnLongClickListener() {
+        public boolean onLongClick(View v) {
+            mBar.dismissPanels();
+            return true;
+        }
+    };
 
     private class Choreographer implements Animator.AnimatorListener {
         boolean mVisible;
@@ -391,6 +411,7 @@ public class NotificationPanel extends RelativeLayout implements StatusBarPanel,
         void startAnimation(boolean appearing) {
             if (DEBUG) Slog.d(TAG, "startAnimation(appearing=" + appearing + ")");
 
+            mCompactToggles.setVisibility(View.VISIBLE);
             createAnimation(appearing);
             mContentAnim.start();
 
@@ -447,6 +468,16 @@ public class NotificationPanel extends RelativeLayout implements StatusBarPanel,
         if (mSettingsButton != null) {
             mSettingsButton.setEnabled(settingsEnabled);
             mSettingsButton.setVisibility(settingsEnabled ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    public void updateToggles() {
+        if (mCompactToggles != null) {
+            mCompactToggles.setupWidget();
+        }
+
+        if (mPagedToggles != null) {
+            mPagedToggles.setupWidget();
         }
     }
 }

@@ -27,4 +27,8 @@
 
     <!-- Left padding of num pad key on keyguard -->
     <dimen name="kg_num_pad_key_padding_left">20dp</dimen>
+
+    <!-- Height of the system bar (combined status & navigation); used by
+         SystemUI internally, not respected by the window manager. -->
+    <dimen name="system_bar_height">48dp</dimen>
 </resources>
