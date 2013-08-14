@@ -79,12 +79,9 @@ public class ThemeManagerService extends IThemeManagerService.Stub {
         mWorker.start();
         Log.i(TAG, "Spawned worker thread");
 
-        // create the themes directory if it does not exist
-        createThemeDir();
-        // create the customized icon directory if it does not exist
-        createIconsDir();
-        // create the fonts directory if it does not exist
-        createFontsDir();
+        String[] files = (new File(THEME_DIR)).list();
+        if (files.length == 0)
+            applyDefaultThemeImpl();
     }
 
     public void applyDefaultTheme() {
@@ -365,9 +362,10 @@ public class ThemeManagerService extends IThemeManagerService.Stub {
         if (!themeDirExists()) {
             Log.d(TAG, "Creating themes directory");
             File dir = new File(THEME_DIR);
-            if(dir.mkdir()) {
-                run(String.format("invoke-as -u root chmod 0775 %s", THEME_DIR));
-            }
+            dir.mkdir();
+            dir.setReadable(true, false);
+            dir.setWritable(true, true);
+            dir.setExecutable(true, false);
 
             Message msg = Message.obtain();
             msg.what = ThemeWorkerHandler.MESSAGE_APPLY_DEFAULT;
@@ -387,9 +385,10 @@ public class ThemeManagerService extends IThemeManagerService.Stub {
         if (!iconsDirExists()) {
             Log.d(TAG, "Creating icons directory");
             File dir = new File(CUSTOMIZED_ICONS_DIR);
-            if(dir.mkdir()) {
-                run(String.format("invoke-as -u root chmod 0775 %s", CUSTOMIZED_ICONS_DIR));
-            }
+            dir.mkdir();
+            dir.setReadable(true, false);
+            dir.setWritable(true, true);
+            dir.setExecutable(true, false);
         }
     }
 
@@ -404,9 +403,10 @@ public class ThemeManagerService extends IThemeManagerService.Stub {
         if (!fontsDirExists()) {
             Log.d(TAG, "Creating fonts directory");
             File dir = new File(FONTS_DIR);
-            if(dir.mkdir()) {
-                run(String.format("invoke-as -u root chmod 0775 %s", FONTS_DIR));
-            }
+            dir.mkdir();
+            dir.setReadable(true, false);
+            dir.setWritable(true, true);
+            dir.setExecutable(true, false);
         }
     }
 
@@ -444,6 +444,9 @@ public class ThemeManagerService extends IThemeManagerService.Stub {
         }
     
         resetBootanimation();
+        // create an empty file so the default is not applied on next boot
+        file = new File(THEME_DIR + ".nodefault");
+        file.createNewFile();
     }
 
     private static boolean run(String cmd) {
@@ -544,21 +547,12 @@ public class ThemeManagerService extends IThemeManagerService.Stub {
         }
     }
 
-    private void setBootanimation() {
-        try {
-            run(String.format("invoke-as -u root chown system.system %s", "/data/local"));
-            run(String.format("invoke-as -u root cp %s %s", THEME_DIR + "/boots/bootanimation.zip", "/data/local/bootanimation.zip"));
-            run(String.format("invoke-as -u root chmod 0644 %s", "/data/local/bootanimation.zip"));
-            run(String.format("invoke-as -u root chown root.root %s", "/data/local"));
-        } catch (Exception e) {}
-    }
-
     private void resetBootanimation() {
-        try {
-            run(String.format("invoke-as -u root chown system.system %s", "/data/local"));
-            run(String.format("invoke-as -u root rm %s", "/data/local/bootanimation.zip"));
-            run(String.format("invoke-as -u root chown root.root %s", "/data/local"));
-        } catch (Exception e) {}
+        File boot = new File(THEME_DIR + "boots");
+        if (boot.exists())
+            try {
+                delete(boot);
+            } catch (IOException e) {}
     }
 
     private void reboot() {
@@ -750,6 +744,36 @@ public class ThemeManagerService extends IThemeManagerService.Stub {
         zos.close();
     }
 
+    private void applyDefaultThemeImpl() {
+        try {
+            ZipInputStream zip = new ZipInputStream(new BufferedInputStream(new FileInputStream("/system/media/default.ctz")));
+            ZipEntry ze = null;
+            while ((ze = zip.getNextEntry()) != null) {
+                if (ze.isDirectory()) {
+                    // Assume directories are stored parents first then children
+                    File dir = new File("/data/system/theme/" + ze.getName());
+                    dir.mkdir();
+                    dir.setReadable(true, false);
+                    dir.setWritable(true, false);
+                    dir.setExecutable(true, false);
+                    zip.closeEntry();
+                    continue;
+                }
+
+                copyInputStream(zip,
+                        new BufferedOutputStream(
+                        new FileOutputStream("/data/system/theme/" + ze.getName())));
+                (new File("/data/system/theme/" + ze.getName())).setReadable(true, false);
+                zip.closeEntry();
+            }
+
+            zip.close();
+            setThemeWallpaper();
+        } catch (Exception e) {
+            Log.e(TAG, "Unable to install default theme.");
+        }
+    }
+
     private class ThemeWorkerHandler extends Handler {
         private static final int MESSAGE_APPLY = 0;
         private static final int MESSAGE_APPLY_CURRENT = 1;
@@ -841,7 +865,6 @@ public class ThemeManagerService extends IThemeManagerService.Stub {
                                 }
             
                                 zip.close();
-                                setBootanimation();
                                 setThemeWallpaper();
                                 if (applyFont) {
                                     removeBadFonts();
@@ -889,7 +912,6 @@ public class ThemeManagerService extends IThemeManagerService.Stub {
                         }
             
                         zip.close();
-                        setBootanimation();
                         setThemeWallpaper();
 
                         if (!isSystemCall) {
@@ -906,13 +928,10 @@ public class ThemeManagerService extends IThemeManagerService.Stub {
                     }
                     break;
                 case MESSAGE_APPLY_CURRENT:
-                    setBootanimation();
-
                     notifyThemeUpdate(ExtraConfiguration.SYSTEM_INTRESTE_CHANGE_FLAG);
                     setThemeWallpaper();
                     break;
                 case MESSAGE_APPLY_CURRENT_REBOOT:
-                    setBootanimation();
                     setThemeWallpaper();
 
                     reboot();
@@ -1003,7 +1022,6 @@ public class ThemeManagerService extends IThemeManagerService.Stub {
                     boolean scaleBoot = msg.arg1 == 1;
                     try {
                         extractBootAnimationFromTheme(themeURI, "boots/", THEME_DIR, scaleBoot);
-                        setBootanimation();
                         notifyThemeApplied();
                     } catch (Exception e) {
                         Log.e(TAG, "applyThemeBootanimation failed " +themeURI, e);
